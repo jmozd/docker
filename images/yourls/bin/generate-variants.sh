@@ -1,20 +1,29 @@
 #!/bin/bash
 set -e
 
-declare -A cmd=(
+declare -rA cmd=(
 	[apache]='apache2-foreground'
 	[fpm]='php-fpm'
 	[fpm-alpine]='php-fpm'
 )
 
-declare -A extras=(
+declare -rA extras=(
 	[apache]='RUN a2enmod rewrite expires'
 	[fpm]=''
 	[fpm-alpine]='RUN apk add --no-cache bash'
 )
 
-declare -A files=(
-	[apache]='COPY .htaccess \/usr\/src\/yourls\/'
+# shellcheck disable=SC2016
+apacheFiles='COPY files/vhost.conf $APACHE_CONFDIR/sites-available/000-default.conf\n'
+# shellcheck disable=SC2016
+apacheFiles+='COPY files/vhost-https.conf $APACHE_CONFDIR/sites-available/default-ssl.conf\n'
+# shellcheck disable=SC2016
+apacheFiles+='COPY files/ports.conf $APACHE_CONFDIR/ports.conf\n\n'
+apacheFiles+='EXPOSE 8080/tcp\n'
+apacheFiles+='EXPOSE 8443/tcp\n'
+
+declare -rA files=(
+	[apache]=$apacheFiles
 	[fpm]=''
 	[fpm-alpine]=''
 )
@@ -34,16 +43,16 @@ for variant in apache fpm fpm-alpine; do
 	sed -ri \
 		-e 's/%%VARIANT%%/'"$variant"'/' \
 		-e 's/%%VARIANT_EXTRAS%%/'"${extras[$variant]}"'/' \
-		-e 's/%%VARIANT_FILES%%/'"${files[$variant]}"'/' \
+		-e 's#%%VARIANT_FILES%%#'"${files[$variant]}"'#' \
 		-e 's/%%VERSION%%/'"$version"'/' \
 		-e 's/%%SHA256%%/'"$sha256"'/' \
 		-e 's/%%CMD%%/'"${cmd[$variant]}"'/' \
 		"$baseFolder$variant/Dockerfile"
 
-	cp -a docker-entrypoint.sh "$baseFolder$variant/docker-entrypoint.sh"
-	cp -a config-docker.php "$baseFolder$variant/config-docker.php"
+	cp -a container-entrypoint.sh "$baseFolder$variant/container-entrypoint.sh"
+	cp -a config-container.php "$baseFolder$variant/config-container.php"
 
 	if [ "$variant" = 'apache' ]; then
-		cp -a yourls.vhost "$baseFolder$variant/.htaccess"
+		cp -a -r files "$baseFolder$variant/files"
 	fi
 done

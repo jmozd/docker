@@ -10,9 +10,14 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write
+  packages: read
+  statuses: write
+
 jobs:
   super-linter:
     name: Code Base
     uses: YOURLS/.github/.github/workflows/lint.yml@main
     with:
-      exclude: Dockerfile.template
+      exclude: images/yourls/Dockerfile.template

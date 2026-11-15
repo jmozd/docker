@@ -4,15 +4,11 @@ name: Analysis
 
 on:
   schedule:
-    - cron: '43 2 * * 6'
+    - cron: "43 2 * * 6"
   workflow_call:
-    inputs:
-      artifact:
-        required: false
-        default: true
-        type: string
-        description: True if analysis must be run against a built artifact
   workflow_dispatch:
+
+permissions: {}
 
 jobs:
   trivy:
@@ -27,30 +23,30 @@ jobs:
         variant: [fpm-alpine, fpm, apache]
     steps:
       - name: Retrieve image artifact
-        uses: actions/download-artifact@v3
-        if: inputs.artifact
+        uses: actions/download-artifact@v8
+        if: contains(fromJSON('["push", "pull_request"]'), github.event_name)
         with:
           name: ${{ matrix.variant }}-image
 
       - name: Run Trivy scanner
-        uses: aquasecurity/trivy-action@0.7.1
-        if: inputs.artifact
+        uses: aquasecurity/trivy-action@v0.36.0
+        if: contains(fromJSON('["push", "pull_request"]'), github.event_name)
         with:
           input: container-image.tar
           format: template
-          template: '@/contrib/sarif.tpl'
+          template: "@/contrib/sarif.tpl"
           output: results.sarif
 
       - name: Run Trivy scanner
-        uses: aquasecurity/trivy-action@0.7.1
-        if: "! inputs.artifact"
+        uses: aquasecurity/trivy-action@v0.36.0
+        if: contains(fromJSON('["schedule", "workflow_dispatch"]'), github.event_name)
         with:
-          image-ref: ghcr.io/${{ secrets.REGISTRY_IMAGE }}:${{ matrix.variant }}
+          image-ref: ghcr.io/${{ vars.REGISTRY_IMAGE }}:${{ matrix.variant }}
           format: template
-          template: '@/contrib/sarif.tpl'
+          template: "@/contrib/sarif.tpl"
           output: results.sarif
 
       - name: Upload scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v4.39.3
         with:
           sarif_file: results.sarif

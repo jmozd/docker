@@ -66,20 +66,10 @@ if [[ "$1" == apache2* ]] || [ "$1" = 'php-fpm' ]; then
 		echo >&2 "Complete! YOURLS has been successfully copied to $PWD"
 	fi
 
-	# if not specified, let's generate a random value
-	: "${YOURLS_COOKIEKEY:=$(head -c1m /dev/urandom | sha1sum | cut -d' ' -f1)}"
-
 	# We want to copy the initial config if the actual config file doesn't already
 	# exist OR if it is an empty file (e.g. it has been created for the volume mount).
 	if [ ! -s user/config.php ]; then
-		cp /usr/src/yourls/user/config-docker.php user/config.php
-
-		: "${YOURLS_USER:=}"
-		: "${YOURLS_PASS:=}"
-		if [ -n "${YOURLS_USER}" ] && [ -n "${YOURLS_PASS}" ]; then
-			result=$(sed "s/  getenv_docker('YOURLS_USER') => getenv_docker('YOURLS_PASS'),/  \'${YOURLS_USER}\' => \'${YOURLS_PASS//&/\\&}\',/g" user/config.php)
-			echo "$result" > user/config.php
-		fi
+		cp /usr/src/yourls/user/config-container.php user/config.php
 
 		if [ "$uid" = '0' ]; then
 			# attempt to ensure that user/config.php is owned by the run user
@@ -87,6 +77,29 @@ if [[ "$1" == apache2* ]] || [ "$1" = 'php-fpm' ]; then
 			chown "$user:$group" user/config.php || true
 		fi
 	fi
+
+	# let's generate a random value to have safe defaults if they aren't specified with environment variables
+	sed -i "s#modify this text with something random#$(head -c1m /dev/urandom | sha1sum | cut -d' ' -f1)#g" user/config.php || true
+
+	# ability to use custom script
+	for file in /docker-entrypoint-init.d/*; do
+		echo >&2 "Running custom script $file"
+		case "$file" in
+		*.sh)
+			if [ -x "$file" ]; then
+				"$file" || exit 1
+			else
+				echo >&2 "... ignoring non-executable $file"
+			fi
+			;;
+		*.php)
+			php -f "$file"
+			;;
+		*)
+			echo >&2 "... ignoring $file"
+			;;
+		esac
+	done
 fi
 
 exec "$@"

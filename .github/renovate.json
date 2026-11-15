@@ -1,31 +1,35 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:base",
-    ":disableDependencyDashboard",
-    "regexManagers:dockerfileVersions"
+    "local>YOURLS/.github:renovate-config",
+    "customManagers:dockerfileVersions"
   ],
-  "labels": ["dependencies"],
-  "rangeStrategy": "bump",
-  "packageRules": [
+  "customManagers": [
     {
-      "matchUpdateTypes": ["minor", "patch"],
-      "automerge": true
-    }
-  ],
-  "regexManagers": [
-    {
-      "fileMatch": [
-        "(^|/|\\.)Dockerfile$",
-        "(^|/)Dockerfile\\.[^/]*$"
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/(^|/|\\.)Dockerfile$/",
+        "/(^|/)Dockerfile\\.[^/]*$/"
       ],
       "matchStrings": [
         "FROM (?<depName>.*?):(?<currentValue>\\d+(?:\\.\\d+)*)-"
       ],
       "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/|\\.)php-version$/"],
+      "matchStrings": [
+        "(?<depName>.*?):(?<currentValue>.*?)@(?<currentDigest>sha256:\\w+)"
+      ],
+      "datasourceTemplate": "docker"
     }
   ],
-  "github-actions": {
-    "enabled": false
-  }
+  "packageRules": [
+    {
+      "matchDepNames": ["php"],
+      "matchUpdateTypes": ["major", "minor"],
+      "automerge": false
+    }
+  ]
 }

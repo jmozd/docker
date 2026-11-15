@@ -7,6 +7,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   metadata:
@@ -15,35 +16,35 @@ jobs:
     outputs:
       version: ${{ steps.version-step.outputs.version }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
 
       - name: Extract current version
         id: version-step
-        run: echo "::set-output name=version::$(grep -oP '^ARG YOURLS_VERSION=\"\K[^\"]+' Dockerfile.template)"
+        run: echo "version=$(grep -oP '^ARG YOURLS_VERSION=\"\K[^\"]+' images/yourls/Dockerfile.template)" >> $GITHUB_OUTPUT
 
   files:
     name: Files
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
 
       - name: Generate variants
-        run: ./bin/generate-variants.sh dist/
+        run: ./images/yourls/bin/generate-variants.sh dist/
 
       - name: Prepare scripts
         run: |
-          mkdir dist/bin
-          cp ./bin/* dist/bin
-          rm ./dist/bin/generate-variants.sh
+          mkdir ./images/yourls/dist/bin
+          cp ./images/yourls/bin/* ./images/yourls/dist/bin
+          rm ./images/yourls/dist/bin/generate-variants.sh
 
       - name: Copy version
-        run: grep -oP '^ARG YOURLS_VERSION="\K[^"]+' Dockerfile.template > ./dist/yourls_version
+        run: grep -oP '^ARG YOURLS_VERSION="\K[^"]+' ./images/yourls/Dockerfile.template > ./images/yourls/dist/yourls_version
 
       - name: Save files
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v7
         with:
           name: context-files
-          path: dist
+          path: ./images/yourls/dist
 
   build:
     name: Build
@@ -56,17 +57,17 @@ jobs:
         variant: [fpm-alpine, fpm, apache]
     steps:
       - name: Retrieve context files
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v8
         with:
           name: context-files
 
-      - run: chmod +x ./*/docker-entrypoint.sh
+      - run: chmod +x ./*/container-entrypoint.sh
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v4
 
       - name: Build
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v7
         with:
           context: ${{ matrix.variant }}
           tags: yourls-test:${{ needs.metadata.outputs.version }}-${{ matrix.variant }}
@@ -75,7 +76,7 @@ jobs:
           cache-to: type=gha,scope=${{ matrix.variant }},mode=max
 
       - name: Save image
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.variant }}-image
           path: /tmp/container-image.tar
@@ -91,12 +92,12 @@ jobs:
       matrix:
         variant: [fpm-alpine, fpm, apache]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
         with:
           repository: docker-library/official-images
 
       - name: Retrieve image artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v8
         with:
           name: ${{ matrix.variant }}-image
 
@@ -131,7 +132,7 @@ jobs:
       contents: write
       packages: write
       id-token: write
+      attestations: write
+      artifact-metadata: write
     with:
       version: ${{ needs.metadata.outputs.version }}
-    secrets:
-      image: ${{ secrets.REGISTRY_IMAGE }}
